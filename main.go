@@ -544,7 +544,32 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
+func performSelfCheck() {
+	healthURL := "http://localhost:8080/health"
+	fmt.Println("Performing self-health-check...")
+
+	resp, err := http.Get(healthURL)
+	if err != nil {
+		fmt.Printf("Self-check failed, couldn't reach server: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		fmt.Println("Self-check successful: Server is healthy.")
+	} else {
+		fmt.Printf("Self-check failed with status: %s\n", resp.Status)
+	}
+}
+
 func main() {
+	ticker := time.NewTicker(3 * time.Minute)
+	go func() {
+		for range ticker.C {
+			performSelfCheck()
+		}
+	}()
+
 	http.HandleFunc("/attendance", attendanceHandler)
 	http.HandleFunc("/timetable", timetableHandler)
 	http.HandleFunc("/health", healthHandler)
@@ -554,6 +579,7 @@ func main() {
 	fmt.Println("  POST /attendance - Get attendance data")
 	fmt.Println("  POST /timetable - Get timetable data")
 	fmt.Println("  GET  /health     - Health check endpoint")
+	fmt.Println("Self-health-check scheduled to run every 3 minutes.")
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
