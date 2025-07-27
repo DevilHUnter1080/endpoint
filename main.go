@@ -534,14 +534,26 @@ func timetableHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
 func main() {
 	http.HandleFunc("/attendance", attendanceHandler)
 	http.HandleFunc("/timetable", timetableHandler)
+	http.HandleFunc("/health", healthHandler)
 
 	fmt.Println("Server started at :8080")
 	fmt.Println("Available endpoints:")
 	fmt.Println("  POST /attendance - Get attendance data")
 	fmt.Println("  POST /timetable - Get timetable data")
+	fmt.Println("  GET  /health     - Health check endpoint")
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
