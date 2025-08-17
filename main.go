@@ -63,7 +63,6 @@ type TimetableResponse struct {
 	Error     string        `json:"error,omitempty"`
 }
 
-// AJAX Response structure
 type AjaxResponse struct {
 	Request interface{} `json:"request"`
 	Error   interface{} `json:"error"`
@@ -111,7 +110,6 @@ func extractHiddenFields(body []byte) (string, string, error) {
 	return viewState, eventValidation, nil
 }
 
-// Original attendance calculation functions from your working code
 func calculateSkippableHours(present, total int) int {
 	if total == 0 || float64(present)/float64(total)*100 < 75 {
 		return 0
@@ -153,24 +151,7 @@ func getCurrentDate() string {
 	return fmt.Sprintf("%02d/%02d", now.Day(), int(now.Month()))
 }
 
-func parseAttendanceValue(text string) (int, int) {
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
-	text = strings.TrimSpace(text)
-
-	re := regexp.MustCompile(`(\d+)\s*/\s*(\d+)`)
-	matches := re.FindStringSubmatch(text)
-
-	if len(matches) >= 3 {
-		present, _ := strconv.Atoi(matches[1])
-		total, _ := strconv.Atoi(matches[2])
-		return present, total
-	}
-
-	return 0, 0
-}
-
 func parseTimeSlot(headerText string) TimeSlot {
-	// Clean the header text and extract period info
 	headerText = strings.ReplaceAll(headerText, "<br/>", "\n")
 	headerText = strings.ReplaceAll(headerText, "<br>", "\n")
 
@@ -251,7 +232,6 @@ func authenticateUser(username, password string) (*http.Client, error) {
 	return client, nil
 }
 
-// Restored original attendance function with proper parsing
 func FetchAttendanceAPI(username, password string) AttendanceResponse {
 	client, err := authenticateUser(username, password)
 	if err != nil {
@@ -275,7 +255,6 @@ func FetchAttendanceAPI(username, password string) AttendanceResponse {
 	todaysAttendance := []string{}
 	subjectAttendance := []string{}
 
-	// Find headers to locate today's column (original logic)
 	headerRow := doc.Find("tr.reportHeading2WithBackground")
 	headers := []string{}
 	headerRow.Find("td").Each(func(i int, s *goquery.Selection) {
@@ -289,7 +268,6 @@ func FetchAttendanceAPI(username, password string) AttendanceResponse {
 		}
 	}
 
-	// Process attendance rows (original logic restored)
 	doc.Find("tr[title]").Each(func(i int, s *goquery.Selection) {
 		cells := s.Find("td.cellBorder")
 		if cells.Length() < 2 {
@@ -306,7 +284,6 @@ func FetchAttendanceAPI(username, password string) AttendanceResponse {
 		totalPresent += present
 		totalClasses += total
 
-		// Check today's attendance (original logic)
 		if todayIndex != -1 && todayIndex < cells.Length() {
 			todayText := strings.TrimSpace(cells.Eq(todayIndex).Text())
 			statuses := []string{}
@@ -342,7 +319,6 @@ func FetchAttendanceAPI(username, password string) AttendanceResponse {
 	}
 }
 
-// Keep your timetable function unchanged
 func FetchTimetableAPI(username, password string) TimetableResponse {
 	client, err := authenticateUser(username, password)
 	if err != nil {
@@ -396,7 +372,6 @@ func FetchTimetableAPI(username, password string) TimetableResponse {
 	}
 
 	var subjectTable *goquery.Selection
-
 	tables.Each(func(i int, table *goquery.Selection) {
 		headerRow := table.Find("tr").First()
 		if strings.Contains(headerRow.Text(), "Subject Code") {
@@ -406,9 +381,7 @@ func FetchTimetableAPI(username, password string) TimetableResponse {
 
 	if subjectTable != nil {
 		subjectTable.Find("tr").Each(func(i int, row *goquery.Selection) {
-			if i == 0 {
-				return // Skip header
-			}
+			if i == 0 { return }
 			cells := row.Find("td")
 			if cells.Length() >= 3 {
 				subject := Subject{
@@ -422,7 +395,6 @@ func FetchTimetableAPI(username, password string) TimetableResponse {
 	}
 
 	var timetableTable *goquery.Selection
-
 	tables.Each(func(i int, table *goquery.Selection) {
 		headerRow := table.Find("tr").First()
 		if strings.Contains(headerRow.Text(), "Day of week") {
@@ -436,34 +408,24 @@ func FetchTimetableAPI(username, password string) TimetableResponse {
 
 	headerCells := timetableTable.Find("tr").First().Find("td")
 	var timeSlots []TimeSlot
-
 	headerCells.Each(func(i int, cell *goquery.Selection) {
-		if i == 0 {
-			return // Skip "Day of week" column
-		}
+		if i == 0 { return }
 		cellHTML, _ := cell.Html()
 		timeSlot := parseTimeSlot(cellHTML)
 		timeSlots = append(timeSlots, timeSlot)
 	})
 
 	timetableTable.Find("tr").Each(func(i int, row *goquery.Selection) {
-		if i == 0 {
-			return // Skip header
-		}
-
+		if i == 0 { return }
 		cells := row.Find("td")
-		if cells.Length() < 2 {
-			return
-		}
+		if cells.Length() < 2 { return }
 
 		day := strings.TrimSpace(cells.First().Text())
 		periods := []PeriodDetail{}
 
 		for j := 1; j < cells.Length(); j++ {
 			timeSlotIdx := j - 1
-			if timeSlotIdx >= len(timeSlots) {
-				break
-			}
+			if timeSlotIdx >= len(timeSlots) { break }
 			subjectCode := strings.TrimSpace(cells.Eq(j).Text())
 			faculty := ""
 			if subjectCode != "" && subjectCode != "&nbsp;" && !strings.Contains(strings.ToLower(subjectCode), "nbsp") {
@@ -499,7 +461,6 @@ func attendanceHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -508,7 +469,6 @@ func attendanceHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	resp := FetchAttendanceAPI(req.Username, req.Password)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -519,7 +479,6 @@ func timetableHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -528,7 +487,6 @@ func timetableHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	resp := FetchTimetableAPI(req.Username, req.Password)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -547,19 +505,37 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func performSelfCheck() {
 	healthURL := "http://localhost:8080/health"
 	fmt.Println("Performing self-health-check...")
-
 	resp, err := http.Get(healthURL)
 	if err != nil {
 		fmt.Printf("Self-check failed, couldn't reach server: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode == http.StatusOK {
 		fmt.Println("Self-check successful: Server is healthy.")
 	} else {
 		fmt.Printf("Self-check failed with status: %s\n", resp.Status)
 	}
+}
+
+// --- ADDED: CORS Middleware ---
+// This function wraps your existing handlers to add the necessary CORS headers.
+func enableCORS(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Set headers
+        w.Header().Set("Access-Control-Allow-Origin", "*") // Allow any origin
+        w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+        w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+        // Check if it's a pre-flight request
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        // Pass down the request to the next handler
+        next.ServeHTTP(w, r)
+    })
 }
 
 func main() {
@@ -570,9 +546,10 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/attendance", attendanceHandler)
-	http.HandleFunc("/timetable", timetableHandler)
-	http.HandleFunc("/health", healthHandler)
+	// --- UPDATED: Wrap your handlers with the CORS middleware ---
+	http.Handle("/attendance", enableCORS(http.HandlerFunc(attendanceHandler)))
+	http.Handle("/timetable", enableCORS(http.HandlerFunc(timetableHandler)))
+	http.Handle("/health", enableCORS(http.HandlerFunc(healthHandler)))
 
 	fmt.Println("Server started at :8080")
 	fmt.Println("Available endpoints:")
